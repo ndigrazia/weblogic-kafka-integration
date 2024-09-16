@@ -1,7 +1,7 @@
 # Weblogic & Kafka Integration
 
 
-## Weblogic 
+## Weblogic & kafka
 
 ### Create a Weblogic Container
 
