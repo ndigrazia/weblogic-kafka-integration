@@ -3,7 +3,10 @@ package com.telefonica.weblogic_kafka_integration.weblogic.sender;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.LocalDateTime;
 import java.util.Hashtable;
+import java.util.UUID;
+
 import javax.jms.JMSException;
 import javax.jms.Queue;
 import javax.jms.QueueConnection;
@@ -19,6 +22,8 @@ import javax.naming.NamingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.telefonica.weblogic_kafka_integration.model.Event;
 import com.telefonica.weblogic_kafka_integration.weblogic.config.JMSApplicationConfig;
 
 public class JMSSender {
@@ -76,8 +81,19 @@ public class JMSSender {
         String jmsFactory = args[1];
         String queueName = args[2];
 
-        String message = "{\"id\": 1, \"message\": \"Hello, world\"}";
+        String data = "{\n" +
+            "    \"creation_date\": \"" +LocalDateTime.now().toString() +"\",\n" +
+            "    \"payload\": {\n" +
+            "        \"notification_event_id\": \""+ UUID.randomUUID().toString() +"\"\n" +
+            "    },\n" +
+            "    \"user_id\": \"string\"\n" +
+            "}";
         
+        Event event = new Event(UUID.randomUUID().toString(), LocalDateTime.now().toString(), 
+            Event.Type.ADD, Event.SubType.USER, "0", data, "ESB");
+      
+        String message = new ObjectMapper().writeValueAsString(event);   
+
         if(args.length >= 4)
              message = args[3];
 
@@ -88,7 +104,9 @@ public class JMSSender {
         sendToServer(sender, message);
 
         LOGGER.info("\nMessage Successfully Sent to the JMS queue!!");
+        LOGGER.info("Message: " + message);
 
         sender.close();
     }
+
 }

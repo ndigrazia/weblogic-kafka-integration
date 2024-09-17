@@ -69,6 +69,17 @@
 			<artifactId>spring-kafka-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!--<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -78,7 +89,7 @@
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
                 	<jvmArguments>--add-opens java.base/java.io=ALL-UNNAMED</jvmArguments>
-            	</configuration>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
