@@ -1,8 +1,6 @@
 package com.telefonica.weblogic_kafka_integration.weblogic.sender;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.time.LocalDateTime;
 import java.util.Hashtable;
 import java.util.UUID;
@@ -30,6 +28,8 @@ public class JMSSender {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSSender.class.getName());
 
+    private static final String FETCH_DELIVERY_MODE = "FetchDeliveryMode";
+
     private QueueConnectionFactory queueConnectionFactory;
     private QueueSession queueSession;
     private QueueConnection queueConnection;
@@ -37,18 +37,24 @@ public class JMSSender {
     private Queue queue;
     private TextMessage message;
 
-    public void init(Context context, String cf, String queueName) throws NamingException, JMSException {
+    public void init(Context context, String cf, String queueName) 
+        throws NamingException, JMSException {
         queueConnectionFactory = (QueueConnectionFactory) context.lookup(cf);
         queue = (Queue) context.lookup(queueName);
         queueConnection = queueConnectionFactory.createQueueConnection();
-        queueSession = queueConnection.createQueueSession(false,Session.AUTO_ACKNOWLEDGE);
+        queueSession = queueConnection.createQueueSession(false,
+            Session.AUTO_ACKNOWLEDGE);
         queueSender = queueSession.createSender(queue);
         message = queueSession.createTextMessage();
         queueConnection.start();
     }
 
-    public void send(String msg) throws JMSException {
+    public void send(String msg, boolean fetchDeliveryMode) throws JMSException {
+        if (fetchDeliveryMode) 
+            message.setBooleanProperty(FETCH_DELIVERY_MODE, true); ;
+
         message.setText(msg);
+
         queueSender.send(message);
     }
 
@@ -58,10 +64,9 @@ public class JMSSender {
         queueConnection.close();
     }
 
-    private static void sendToServer(JMSSender sender, String msg) throws IOException, JMSException {
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
-        sender.send(msg);
-        bufferedReader.close();
+    private static void sendToServer(JMSSender sender, String msg,
+        boolean fetchDeliveryMode) throws IOException, JMSException {
+        sender.send(msg, fetchDeliveryMode);
     }
 
     private static InitialContext getInitialContext(String server) throws NamingException {
@@ -72,41 +77,52 @@ public class JMSSender {
     }
 
     public static void main(String args[]) throws Exception {
+        String message = "";
+
         if (args.length < 3) {
-            System.out.println("Usage: java JMSSender <PROVIDER_URL> <JMS_FACTORY> <QUEUE> <MESSAGE>");
+            System.out.println("Usage: java JMSSender <PROVIDER_URL> " + 
+                "<JMS_FACTORY> <QUEUE> <FETCH_DELIVERY_MODE> <MESSAGE>");
             return;
         }
 
         String server = args[0];
         String jmsFactory = args[1];
         String queueName = args[2];
+        boolean fetchDeliveryMode = Boolean.parseBoolean(args[3]);
+        
+        if(args.length >= 5)
+            message = args[4];
+        else
+            message = new ObjectMapper().writeValueAsString(
+                createASampleEvent());  
 
-        String data = "{\n" +
-            "    \"creation_date\": \"" +LocalDateTime.now().toString() +"\",\n" +
+        JMSSender sender = new JMSSender();
+        
+        sender.init(getInitialContext(server), jmsFactory, queueName);
+        
+        sendToServer(sender, message, fetchDeliveryMode);
+
+        LOGGER.info("\nMessage Successfully Sent to the JMS queue!!\n MESSAGE: " + message);
+      
+        sender.close();
+    }
+
+    private static Event createASampleEvent() {
+        String now = LocalDateTime.now().toString();
+        String uuid = UUID.randomUUID().toString();
+
+        String payload = "{\n" +
+            "    \"creation_date\": \"" + now +"\",\n" +
             "    \"payload\": {\n" +
-            "        \"notification_event_id\": \""+ UUID.randomUUID().toString() +"\"\n" +
+            "        \"notification_event_id\": \""+ uuid +"\"\n" +
             "    },\n" +
             "    \"user_id\": \"string\"\n" +
             "}";
         
-        Event event = new Event(UUID.randomUUID().toString(), LocalDateTime.now().toString(), 
-            Event.Type.ADD, Event.SubType.USER, "0", data, "ESB");
-      
-        String message = new ObjectMapper().writeValueAsString(event);   
+        Event event = new Event(uuid, now, Event.Type.ADD, 
+            Event.SubType.USER, "0", payload, "ESB");
 
-        if(args.length >= 4)
-             message = args[3];
-
-        InitialContext initialContext = getInitialContext(server);
-        
-        JMSSender sender = new JMSSender();
-        sender.init(initialContext, jmsFactory, queueName);
-        sendToServer(sender, message);
-
-        LOGGER.info("\nMessage Successfully Sent to the JMS queue!!");
-        LOGGER.info("Message: " + message);
-
-        sender.close();
+        return event;
     }
 
 }
