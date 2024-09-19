@@ -51,7 +51,7 @@ public class JMSSender {
 
     public void send(String msg, boolean fetchDeliveryMode) throws JMSException {
         if (fetchDeliveryMode) 
-            message.setBooleanProperty(FETCH_DELIVERY_MODE, true); ;
+            message.setBooleanProperty(FETCH_DELIVERY_MODE, true);
 
         message.setText(msg);
 
