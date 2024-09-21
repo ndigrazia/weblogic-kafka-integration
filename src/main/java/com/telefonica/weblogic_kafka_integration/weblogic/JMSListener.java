@@ -42,23 +42,23 @@ public class JMSListener {
 
     private ObjectMapper mapper = new ObjectMapper();
 
-    @Value(value = "${message.topic.name}")
+    @Value(value = "${kafka.topic.name}")
     private String topicName;  
 
-    @Value(value = "${message.async}")
-    private String async;
+    @Value(value = "${async.mode}")
+    private Boolean isAsyncMode;
 
     @Value(value = "${message.headers}")
     private List<String> acceptedHeaders;
     
-    @JmsListener(containerFactory = "factory", destination = "${jms.destination.name}")
+    @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
     public void listenToMessages(Message msg) throws JMSException {
         Event payload = payload(msg);
         Map<String, String> headers = headers(msg);
 
         logMessage("MESSAGE RECEIVED", msg.getBody(String.class), headers);
 
-        if (async.equalsIgnoreCase("true")) {
+        if (isAsyncMode) {
             sendAsync(topicName, payload, headers);
             return;
         }

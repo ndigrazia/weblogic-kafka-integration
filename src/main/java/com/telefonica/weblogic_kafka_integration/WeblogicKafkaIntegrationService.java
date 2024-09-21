@@ -8,10 +8,10 @@ import org.springframework.jms.annotation.EnableJms;
 
 @SpringBootApplication(exclude = JmxAutoConfiguration.class)
 @EnableJms
-public class WeblogicKafkaIntegrationApplication {
+public class WeblogicKafkaIntegrationService {
 
 	public static void main(String[] args) {
-		SpringApplication.run(WeblogicKafkaIntegrationApplication.class, args);
+		SpringApplication.run(WeblogicKafkaIntegrationService.class, args);
 	}
 
 }

@@ -2,7 +2,10 @@ package com.telefonica.weblogic_kafka_integration.weblogic.sender;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Map;
 import java.util.UUID;
 
 import javax.jms.JMSException;
@@ -20,6 +23,7 @@ import javax.naming.NamingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.telefonica.weblogic_kafka_integration.model.Event;
 import com.telefonica.weblogic_kafka_integration.weblogic.config.JMSApplicationConfig;
@@ -29,6 +33,7 @@ public class JMSSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSSender.class.getName());
 
     private static final String FETCH_DELIVERY_MODE = "FetchDeliveryMode";
+    private static final String DELAYED_MODE = "DelayedMode";
 
     private QueueConnectionFactory queueConnectionFactory;
     private QueueSession queueSession;
@@ -49,13 +54,17 @@ public class JMSSender {
         queueConnection.start();
     }
 
-    public void send(String msg, boolean fetchDeliveryMode) throws JMSException {
-        if (fetchDeliveryMode) 
+    public TextMessage send(String msg, boolean withHeaders) throws JMSException {
+        if (withHeaders) {
             message.setBooleanProperty(FETCH_DELIVERY_MODE, true);
-
+            message.setBooleanProperty(DELAYED_MODE, true);
+        } 
+           
         message.setText(msg);
 
         queueSender.send(message);
+
+        return message;
     }
 
     public void close() throws JMSException {
@@ -64,9 +73,9 @@ public class JMSSender {
         queueConnection.close();
     }
 
-    private static void sendToServer(JMSSender sender, String msg,
-        boolean fetchDeliveryMode) throws IOException, JMSException {
-        sender.send(msg, fetchDeliveryMode);
+    private static TextMessage sendToServer(JMSSender sender, String msg,
+        boolean withHeaders) throws IOException, JMSException {
+        return sender.send(msg, withHeaders);
     }
 
     private static InitialContext getInitialContext(String server) throws NamingException {
@@ -76,35 +85,68 @@ public class JMSSender {
         return new InitialContext(env);
     }
 
-    public static void main(String args[]) throws Exception {
-        String message = "";
+    public static void main(String args[]) {
+        String payload = "";
 
         if (args.length < 3) {
             System.out.println("Usage: java JMSSender <PROVIDER_URL> " + 
-                "<JMS_FACTORY> <QUEUE> <FETCH_DELIVERY_MODE> <MESSAGE>");
+                "<JMS_FACTORY> <QUEUE> <WITH_HEADERS> <MESSAGE>");
             return;
         }
 
         String server = args[0];
         String jmsFactory = args[1];
         String queueName = args[2];
-        boolean fetchDeliveryMode = Boolean.parseBoolean(args[3]);
+        boolean withHeaders = Boolean.parseBoolean(args[3]);
         
         if(args.length >= 5)
-            message = args[4];
-        else
-            message = new ObjectMapper().writeValueAsString(
-                createASampleEvent());  
+            payload = args[4];
+        else {
+            try {
+                payload = new ObjectMapper().writeValueAsString(
+                    createASampleEvent());
+            } catch (JsonProcessingException e) {
+                LOGGER.error("PARSING ERROR:", e);
+                return;
+            }  
+        }
 
-        JMSSender sender = new JMSSender();
-        
-        sender.init(getInitialContext(server), jmsFactory, queueName);
-        
-        sendToServer(sender, message, fetchDeliveryMode);
+        JMSSender sender = null;
 
-        LOGGER.info("\nMessage Successfully Sent to the JMS queue!!\n MESSAGE: " + message);
-      
-        sender.close();
+        try {
+            sender = new JMSSender();
+        
+            sender.init(getInitialContext(server), jmsFactory, queueName);
+
+            TextMessage message = sendToServer(sender, payload, withHeaders);
+
+            Map<String, String> headers = null;
+            if(withHeaders) {
+                headers = new HashMap<String, String>();
+
+                Enumeration<?> props = message.getPropertyNames();
+
+                while (props.hasMoreElements()) {
+                    String key = (String) props.nextElement();
+                    String value = message.getObjectProperty(key).toString();
+                    headers.put(key, value);
+                }
+            }
+                     
+            LOGGER.info("\nMessage Successfully Sent to the JMS queue!!\n MESSAGE: " +
+                 message.getBody(String.class) +  "\n HEADERS: " +(headers == null ? "empty" : headers) + "\n");
+        } catch (Exception e) {
+            LOGGER.error("\nError sending message to the JMS queue!!");
+        } finally {
+            if(sender != null)
+                try {
+                    sender.close();
+                } catch (JMSException e) {
+                    LOGGER.error("CLOSE CONNECTION ERROR: ", e);
+                    return;
+                }
+        }
+
     }
 
     private static Event createASampleEvent() {

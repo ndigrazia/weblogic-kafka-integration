@@ -23,7 +23,7 @@ public class JMSApplicationConfig {
     private String providerUrl;
     
     // Name of the queue o topic to extract the message
-    @Value("${jms.destination.name}")
+    @Value("${jms.queue.name}")
     private String destinationName;
     
     // Number of consumers in the application
