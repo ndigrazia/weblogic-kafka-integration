@@ -29,7 +29,7 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.telefonica.weblogic_kafka_integration.model.Event;
+import com.telefonica.schemas.EventSchema;
 
 @Service
 @Transactional
@@ -38,7 +38,7 @@ public class JMSListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSListener.class.getName());
  
     @Autowired
-    private KafkaTemplate<String, Event> kafkaTemplate;
+    private KafkaTemplate<String, EventSchema> kafkaTemplate;
 
     private ObjectMapper mapper = new ObjectMapper();
 
@@ -53,7 +53,7 @@ public class JMSListener {
     
     @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
     public void listenToMessages(Message msg) throws JMSException {
-        Event payload = payload(msg);
+        EventSchema payload = payload(msg);
         Map<String, String> headers = headers(msg);
 
         logMessage("MESSAGE RECEIVED", msg.getBody(String.class), headers);
@@ -75,7 +75,8 @@ public class JMSListener {
         logCustomMsg(header, sb.toString());
     }
 
-    private void sendSync(String topic, Event payload, Map<String, String> headers) throws JMSException {
+    private void sendSync(String topic, EventSchema payload, Map<String, String> headers) 
+        throws JMSException {
         try {
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers)).get();
             logMessage("MESSAGE SENT TO KAFKA", asJSONString(payload), headers);
@@ -89,9 +90,9 @@ public class JMSListener {
         }
     }     
 
-    private org.springframework.messaging.Message<Event> createKafkaMessage(String topic, 
-        Event payload, Map<String, String> headers) {
-        org.springframework.messaging.Message<Event> message = MessageBuilder
+    private org.springframework.messaging.Message<EventSchema> createKafkaMessage(String topic, 
+        EventSchema payload, Map<String, String> headers) {
+        org.springframework.messaging.Message<EventSchema> message = MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, topic)
                 .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEvent_id())
@@ -117,10 +118,10 @@ public class JMSListener {
         return map;
     }
 
-    private Event payload(Message msg) throws JMSException {
+    private EventSchema payload(Message msg) throws JMSException {
         try {
            return mapper.readValue(msg.getBody(String.class),
-                Event.class);
+            EventSchema.class);
         } catch (JsonProcessingException ex) {
             logCustomErrorMsg("ERROR PARSING JSON MESSAGE", 
                 ex.getMessage());
@@ -131,13 +132,14 @@ public class JMSListener {
         }
     }
 
-    private void sendAsync(String topic, Event payload, Map<String, String> headers) throws JMSException {
-        ListenableFuture<SendResult<String, Event>> future = 
+    private void sendAsync(String topic, EventSchema payload, Map<String, String> headers) 
+        throws JMSException {
+        ListenableFuture<SendResult<String, EventSchema>> future = 
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers));
 
-        future.addCallback(new ListenableFutureCallback<SendResult<String, Event>>() {
+        future.addCallback(new ListenableFutureCallback<SendResult<String, EventSchema>>() {
             @Override
-            public void onSuccess(SendResult<String, Event> result) {
+            public void onSuccess(SendResult<String, EventSchema> result) {
                 try {
                     logMessage("MESSAGE SENT TO KAFKA", asJSONString(payload), headers);
                 } catch (JsonProcessingException e) {
@@ -167,7 +169,7 @@ public class JMSListener {
         LOGGER.error(customMsg(header, msg));
     }
 
-    private String  asJSONString(Event e) throws JsonProcessingException {
+    private String  asJSONString(EventSchema e) throws JsonProcessingException {
         return mapper.writeValueAsString(e);
     }
     

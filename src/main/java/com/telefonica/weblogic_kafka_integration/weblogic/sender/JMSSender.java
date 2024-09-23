@@ -25,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.telefonica.weblogic_kafka_integration.model.Event;
+import com.telefonica.schemas.EventSchema;
 import com.telefonica.weblogic_kafka_integration.weblogic.config.JMSApplicationConfig;
 
 public class JMSSender {
@@ -149,7 +149,7 @@ public class JMSSender {
 
     }
 
-    private static Event createASampleEvent() {
+    private static EventSchema createASampleEvent() {
         String now = LocalDateTime.now().toString();
         String uuid = UUID.randomUUID().toString();
 
@@ -161,8 +161,8 @@ public class JMSSender {
             "    \"user_id\": \"string\"\n" +
             "}";
         
-        Event event = new Event(uuid, now, Event.Type.ADD, 
-            Event.SubType.USER, "0", payload, "ESB");
+            EventSchema event = new EventSchema(uuid, now, EventSchema.Type.ADD, 
+            EventSchema.SubType.USER, "0", payload, "ESB");
 
         return event;
     }

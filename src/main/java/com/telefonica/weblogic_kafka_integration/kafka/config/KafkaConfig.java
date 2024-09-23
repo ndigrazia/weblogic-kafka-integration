@@ -11,7 +11,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 
-import com.telefonica.weblogic_kafka_integration.model.Event;
+import com.telefonica.schemas.EventSchema;
 
 @Configuration
 public class KafkaConfig {
@@ -29,7 +29,7 @@ public class KafkaConfig {
     private String valueSerializerClass;
 
     @Bean
-    public ProducerFactory<String, Event> kafkaFactory() {
+    public ProducerFactory<String, EventSchema> kafkaFactory() {
         Map<String, Object> configProps = new HashMap<>();
         
         configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
@@ -41,7 +41,7 @@ public class KafkaConfig {
     }
     
     @Bean
-    public KafkaTemplate<String, Event> kafkaTemplate() {
+    public KafkaTemplate<String, EventSchema> kafkaTemplate() {
         return new KafkaTemplate<>(kafkaFactory());
     }
 
