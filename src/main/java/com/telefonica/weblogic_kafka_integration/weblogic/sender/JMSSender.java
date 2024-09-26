@@ -80,14 +80,14 @@ public class JMSSender {
 
     private static InitialContext getInitialContext(String server) throws NamingException {
         Hashtable<String, String> env = new Hashtable<String, String>();
+        
         env.put(Context.INITIAL_CONTEXT_FACTORY, JMSApplicationConfig.INITIAL_CONTEXT);
         env.put(Context.PROVIDER_URL, server);
+
         return new InitialContext(env);
     }
 
     public static void main(String args[]) {
-        String payload = "";
-
         if (args.length < 3) {
             System.out.println("Usage: java JMSSender <PROVIDER_URL> " + 
                 "<JMS_FACTORY> <QUEUE> <WITH_HEADERS> <MESSAGE>");
@@ -99,6 +99,8 @@ public class JMSSender {
         String queueName = args[2];
         boolean withHeaders = Boolean.parseBoolean(args[3]);
         
+        final String payload;
+
         if(args.length >= 5)
             payload = args[4];
         else {
@@ -146,14 +148,13 @@ public class JMSSender {
                     return;
                 }
         }
-
     }
 
     private static EventSchema createASampleEvent() {
-        String now = LocalDateTime.now().toString();
-        String uuid = UUID.randomUUID().toString();
+        final String now = LocalDateTime.now().toString();
+        final String uuid = UUID.randomUUID().toString();
 
-        String payload = "{\n" +
+        final String payload = "{\n" +
             "    \"creation_date\": \"" + now +"\",\n" +
             "    \"payload\": {\n" +
             "        \"notification_event_id\": \""+ uuid +"\"\n" +
@@ -161,10 +162,8 @@ public class JMSSender {
             "    \"user_id\": \"string\"\n" +
             "}";
         
-            EventSchema event = new EventSchema(uuid, now, EventSchema.Type.ADD, 
+        return new EventSchema(uuid, now, EventSchema.Type.ADD, 
             EventSchema.SubType.USER, "0", payload, "ESB");
-
-        return event;
     }
 
 }

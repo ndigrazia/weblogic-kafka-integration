@@ -53,8 +53,8 @@ public class JMSListener {
     
     @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
     public void listenToMessages(Message msg) throws JMSException {
-        EventSchema payload = payload(msg);
-        Map<String, String> headers = headers(msg);
+        final EventSchema payload = payload(msg);
+        final Map<String, String> headers = headers(msg);
 
         logMessage("MESSAGE RECEIVED", msg.getBody(String.class), headers);
 
@@ -62,12 +62,13 @@ public class JMSListener {
             sendAsync(topicName, payload, headers);
             return;
         }
+        
     
         sendSync(topicName, payload, headers);
     }
 
     private void logMessage(String header, String body, Map<String, String> headers) {
-        StringBuffer sb = new StringBuffer();
+        final StringBuffer sb = new StringBuffer();
 
         sb.append("BODY: " + body + "\n");
         sb.append("HEADERS: " + headers + "\n");
@@ -77,7 +78,7 @@ public class JMSListener {
 
     private void sendSync(String topic, EventSchema payload, Map<String, String> headers) 
         throws JMSException {
-        try {
+            try {
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers)).get();
             logMessage("MESSAGE SENT TO KAFKA", asJSONString(payload), headers);
         } catch (InterruptedException | ExecutionException | JsonProcessingException e) {
@@ -92,7 +93,7 @@ public class JMSListener {
 
     private org.springframework.messaging.Message<EventSchema> createKafkaMessage(String topic, 
         EventSchema payload, Map<String, String> headers) {
-        org.springframework.messaging.Message<EventSchema> message = MessageBuilder
+        final org.springframework.messaging.Message<EventSchema> message = MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, topic)
                 .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEvent_id())
