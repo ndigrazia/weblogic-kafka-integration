@@ -32,8 +32,8 @@ public class JMSSender {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSSender.class.getName());
 
-    private static final String FETCH_DELIVERY_MODE = "FetchDeliveryMode";
-    private static final String DELAYED_MODE = "DelayedMode";
+    private static final String ENRICHMENT_MODE = "EnrichmentEventContext";
+    private static final String DELAYED_MODE = "EventDeliveryMode";
 
     private QueueConnectionFactory queueConnectionFactory;
     private QueueSession queueSession;
@@ -56,8 +56,8 @@ public class JMSSender {
 
     public TextMessage send(String msg, boolean withHeaders) throws JMSException {
         if (withHeaders) {
-            message.setBooleanProperty(FETCH_DELIVERY_MODE, true);
-            message.setBooleanProperty(DELAYED_MODE, true);
+            message.setStringProperty(ENRICHMENT_MODE, "EventType");
+            message.setStringProperty(DELAYED_MODE, "Delayed");
         } 
            
         message.setText(msg);
