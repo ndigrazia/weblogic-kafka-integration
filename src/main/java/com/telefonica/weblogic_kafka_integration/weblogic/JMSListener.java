@@ -5,9 +5,9 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.ExecutionException;
 
+import javax.annotation.PostConstruct;
 import javax.jms.JMSException;
 import javax.jms.Message;
 
@@ -29,7 +29,8 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.telefonica.schemas.EventSchema;
+import com.telefonica.weblogic_kafka_integration.kafka.core.MessageDeliveryMode;
+import com.telefonica.weblogic_kafka_integration.schemas.EventSchema;
 
 @Service
 @Transactional
@@ -45,47 +46,65 @@ public class JMSListener {
     @Value(value = "${kafka.topic.name}")
     private String topicName;  
 
-    @Value(value = "${async.mode}")
-    private Boolean isAsyncMode;
+    @Value(value = "${delivery.mode}")
+    private String deliveryMode;
 
     @Value(value = "${message.headers}")
     private List<String> acceptedHeaders;
-    
+
+    @PostConstruct
+    public void init() {
+        if(MessageDeliveryMode.valueOf(deliveryMode).equals(MessageDeliveryMode.NONE))
+            LOGGER.info("There is no Delivery Mode. Notifications will not be sent!");
+    }
+
     @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
     public void listenToMessages(Message msg) throws JMSException {
-        final EventSchema payload = payload(msg);
-        final Map<String, String> headers = headers(msg);
-
-        logMessage("MESSAGE RECEIVED", msg.getBody(String.class), headers);
-
-        if (isAsyncMode) {
-            sendAsync(topicName, payload, headers);
-            return;
+         try {
+            processMessage(msg);
+        } catch (Exception e) {
+            handleError(e);
+            throw e;
         }
-        
-    
-        sendSync(topicName, payload, headers);
     }
 
-    private void logMessage(String header, String body, Map<String, String> headers) {
-        final StringBuffer sb = new StringBuffer();
-
-        sb.append("BODY: " + body + "\n");
-        sb.append("HEADERS: " + headers + "\n");
+    public void processMessage(Message msg) throws JMSException {
+        final EventSchema payload = parsePayload(msg);
+        final Map<String, String> headers = extractHeaders(msg);
     
-        logCustomMsg(header, sb.toString());
+        logMessage("MESSAGE RECEIVED", payload, headers);
+                
+        sendMessage(payload, headers);
     }
 
-    private void sendSync(String topic, EventSchema payload, Map<String, String> headers) 
+    private void sendMessage(EventSchema payload, Map<String, String> headers) 
         throws JMSException {
-            try {
+        if(LOGGER.isDebugEnabled())
+            LOGGER.debug("Delibery Mode: " + deliveryMode); 
+        
+        switch (MessageDeliveryMode.valueOf(deliveryMode)) {
+            case NONE: 
+                break;
+            case SYNC:
+                sendMessageSync(topicName, payload, headers);
+                break;
+            case ASYNC:
+                sendMessageAsync(topicName, payload, headers);
+                break;
+            default:
+                LOGGER.info("Delivery Mode is not valid. Use NONE, SYNC, ASYNC.");
+                break;
+        }
+    }
+
+    private void sendMessageSync(String topic, EventSchema payload, Map<String, String> headers) 
+        throws JMSException {
+        try {
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers)).get();
-            logMessage("MESSAGE SENT TO KAFKA", asJSONString(payload), headers);
-        } catch (InterruptedException | ExecutionException | JsonProcessingException e) {
-            logCustomErrorMsg("ERROR SENDING MESSAGE TO KAFKA", 
-                e.getMessage());
+            logMessage("MESSAGE SENT TO KAFKA", payload, headers);
+         } catch (InterruptedException | ExecutionException e) {
             JMSException jmsException = 
-                new JMSException("Error sending message to kafka.");
+                new JMSException("ERROR SENDING MESSAGE TO KAFA.");
             jmsException.initCause(e);
             throw jmsException;
         }
@@ -96,14 +115,14 @@ public class JMSListener {
         final org.springframework.messaging.Message<EventSchema> message = MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, topic)
-                .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEvent_id())
+                .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEventId())
                 .copyHeaders(headers)
                 .build();
 
         return message;
     }
 
-    private Map<String, String> headers(Message msg) throws JMSException {
+    private Map<String, String> extractHeaders(Message msg) throws JMSException {
         Map<String, String> map = new HashMap<String, String>();
 
         Enumeration<?> propertyNames = msg.getPropertyNames();
@@ -119,40 +138,31 @@ public class JMSListener {
         return map;
     }
 
-    private EventSchema payload(Message msg) throws JMSException {
+    private EventSchema parsePayload(Message msg) throws JMSException {
         try {
            return mapper.readValue(msg.getBody(String.class),
             EventSchema.class);
         } catch (JsonProcessingException ex) {
-            logCustomErrorMsg("ERROR PARSING JSON MESSAGE", 
-                ex.getMessage());
             JMSException jmsException = 
-                new JMSException("Error parsing json message.");
+                new JMSException("ERROR PARSING JSON MESSAGE.");
             jmsException.initCause(ex);
             throw jmsException;
         }
     }
 
-    private void sendAsync(String topic, EventSchema payload, Map<String, String> headers) 
-        throws JMSException {
+    private void sendMessageAsync(String topic, EventSchema payload, Map<String, String> headers) {
         ListenableFuture<SendResult<String, EventSchema>> future = 
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers));
 
         future.addCallback(new ListenableFutureCallback<SendResult<String, EventSchema>>() {
             @Override
             public void onSuccess(SendResult<String, EventSchema> result) {
-                try {
-                    logMessage("MESSAGE SENT TO KAFKA", asJSONString(payload), headers);
-                } catch (JsonProcessingException e) {
-                    logCustomErrorMsg("ERROR PARSING MESSAGE", 
-                        e.getMessage());
-                }
+                logMessage("MESSAGE SENT TO KAFKA", payload, headers);
             }
 
             @Override
             public void onFailure(Throwable ex) {
-                logCustomErrorMsg("ERROR SENDING MESSAGE TO KAFKA", 
-                    ex.getMessage());
+                logErrorMsg("ERROR SENDING MESSAGE TO KAFKA", ex.getMessage());
             }
         });
     }
@@ -162,16 +172,30 @@ public class JMSListener {
             + ". MSG: " + msg;
     } 
     
-    private void logCustomMsg(String header, String msg) {
+    private void logInfoMsg(String header, String msg) {
         LOGGER.info(customMsg(header, msg));
     }
 
-    private void logCustomErrorMsg(String header, String msg) {
+    private void logErrorMsg(String header, String msg) {
         LOGGER.error(customMsg(header, msg));
     }
 
-    private String  asJSONString(EventSchema e) throws JsonProcessingException {
-        return mapper.writeValueAsString(e);
-    }
+    private void logMessage(String message, EventSchema payload, Map<String, String> headers) {
+        try {
+            final StringBuffer sb = new StringBuffer();
+
+            sb.append("BODY: " +  mapper.writeValueAsString(payload) + "\n");
+            sb.append("HEADERS: " + headers + "\n");
     
+            logInfoMsg(message, sb.toString());
+        } catch (JsonProcessingException e) {
+            logErrorMsg("JSON PARSE ERROR", 
+                "Conversion of JSON Body to String failed. The message did not log!");
+        }           
+    }
+
+    private void handleError(Throwable e) {
+        logErrorMsg("ERROR PROCESSING MESSAGE", e.getMessage());        
+    }
+
 }

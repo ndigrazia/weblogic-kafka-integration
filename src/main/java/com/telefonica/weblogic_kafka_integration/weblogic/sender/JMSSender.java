@@ -1,12 +1,10 @@
 package com.telefonica.weblogic_kafka_integration.weblogic.sender;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.UUID;
 
 import javax.jms.JMSException;
 import javax.jms.Queue;
@@ -23,9 +21,6 @@ import javax.naming.NamingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.telefonica.schemas.EventSchema;
 import com.telefonica.weblogic_kafka_integration.weblogic.config.JMSApplicationConfig;
 
 public class JMSSender {
@@ -104,13 +99,7 @@ public class JMSSender {
         if(args.length >= 5)
             payload = args[4];
         else {
-            try {
-                payload = new ObjectMapper().writeValueAsString(
-                    createASampleEvent());
-            } catch (JsonProcessingException e) {
-                LOGGER.error("PARSING ERROR:", e);
-                return;
-            }  
+            payload = createASampleEvent();
         }
 
         JMSSender sender = null;
@@ -150,20 +139,28 @@ public class JMSSender {
         }
     }
 
-    private static EventSchema createASampleEvent() {
-        final String now = LocalDateTime.now().toString();
-        final String uuid = UUID.randomUUID().toString();
-
-        final String payload = "{\n" +
-            "    \"creation_date\": \"" + now +"\",\n" +
-            "    \"payload\": {\n" +
-            "        \"notification_event_id\": \""+ uuid +"\"\n" +
+    private static String createASampleEvent() {
+        String jsonString = "{\n" +
+            "    \"creation_issue\": \"2024-10-03\",\n" +
+            "    \"event_id\": \"597e8f46-c021-4a66-884c-20e2ba1ec0c5\",\n" +
+            "    \"type\": \"UPDATE\",\n" +
+            "    \"subtype\": \"IDENTIFIER\",\n" +
+            "    \"version\": \"0\",\n" +
+            "    \"data\": {\n" +
+            "        \"creation_date\": \"2024-10-03\",\n" +
+            "        \"payload\": {\n" +
+            "            \"new_identifier.id\": \"265946425\",\n" +
+            "            \"new_identifier.type\": \"1122334455\",\n" +
+            "            \"notification_event_id\": \"597e8f46-c021-4a66-884c-20e2ba1ec0c5\",\n" +
+            "            \"old_identifier.id\": \"163143603\",\n" +
+            "            \"old_identifier.type\": \"\"\n" +
+            "        },\n" +
+            "        \"user_id\": \"163143603\"\n" +
             "    },\n" +
-            "    \"user_id\": \"string\"\n" +
+            "    \"publisher\": \"ESB\"\n" +
             "}";
-        
-        return new EventSchema(uuid, now, EventSchema.Type.ADD, 
-            EventSchema.SubType.USER, "0", payload, "ESB");
+            
+        return jsonString;
     }
 
 }
