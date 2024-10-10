@@ -30,7 +30,7 @@ import org.springframework.util.concurrent.ListenableFutureCallback;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.telefonica.weblogic_kafka_integration.kafka.core.MessageDeliveryMode;
-import com.telefonica.weblogic_kafka_integration.schemas.EventSchema;
+import com.telefonica.schemas.EventSchema;
 
 @Service
 @Transactional

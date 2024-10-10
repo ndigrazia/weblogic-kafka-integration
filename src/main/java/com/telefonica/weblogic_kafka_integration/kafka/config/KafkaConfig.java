@@ -11,7 +11,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 
-import com.telefonica.weblogic_kafka_integration.schemas.EventSchema;
+import com.telefonica.schemas.EventSchema;
 
 @Configuration
 public class KafkaConfig {
