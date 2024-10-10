@@ -47,15 +47,24 @@ public class JMSListener {
     private String topicName;  
 
     @Value(value = "${delivery.mode}")
-    private String deliveryMode;
+    String deliveryMode;
 
-    @Value(value = "${message.headers}")
-    private List<String> acceptedHeaders;
+    @Value(value = "${accepted.headers}")
+    List<String> acceptedHeaders;
+    
+    @Value(value = "${filtered.headers}")
+    boolean filteredHeaders;
+
+    @Value("${spring.kafka.partition:#{null}}") 
+    private Integer partition;
 
     @PostConstruct
     public void init() {
         if(MessageDeliveryMode.valueOf(deliveryMode).equals(MessageDeliveryMode.NONE))
             LOGGER.info("There is no Delivery Mode. Notifications will not be sent!");
+        
+        if(!filteredHeaders)
+            LOGGER.info("All headers will be sent");
     }
 
     @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
@@ -68,16 +77,22 @@ public class JMSListener {
         }
     }
 
-    public void processMessage(Message msg) throws JMSException {
+    private void processMessage(Message msg) throws JMSException {
         final EventSchema payload = parsePayload(msg);
-        final Map<String, String> headers = extractHeaders(msg);
+        
+        final Map<String, Object> headers = new HashMap<>();
+        addHeaders(headers, msg);
     
         logMessage("MESSAGE RECEIVED", payload, headers);
-                
+
+        //If 'partition' is defined and valid, set the partition header
+        if(partition!=null)
+            headers.put(KafkaHeaders.PARTITION_ID, partition);
+        
         sendMessage(payload, headers);
     }
-
-    private void sendMessage(EventSchema payload, Map<String, String> headers) 
+        
+    private void sendMessage(EventSchema payload, Map<String, ?> headers) 
         throws JMSException {
         if(LOGGER.isDebugEnabled())
             LOGGER.debug("Delibery Mode: " + deliveryMode); 
@@ -97,7 +112,7 @@ public class JMSListener {
         }
     }
 
-    private void sendMessageSync(String topic, EventSchema payload, Map<String, String> headers) 
+    private void sendMessageSync(String topic, EventSchema payload, Map<String, ?> headers) 
         throws JMSException {
         try {
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers)).get();
@@ -111,7 +126,7 @@ public class JMSListener {
     }     
 
     private org.springframework.messaging.Message<EventSchema> createKafkaMessage(String topic, 
-        EventSchema payload, Map<String, String> headers) {
+        EventSchema payload, Map<String, ?> headers) {
         final org.springframework.messaging.Message<EventSchema> message = MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, topic)
@@ -122,20 +137,22 @@ public class JMSListener {
         return message;
     }
 
-    private Map<String, String> extractHeaders(Message msg) throws JMSException {
-        Map<String, String> map = new HashMap<String, String>();
-
+    void addHeaders(Map<String, Object> headers, Message msg) throws JMSException {
         Enumeration<?> propertyNames = msg.getPropertyNames();
 
         while (propertyNames.hasMoreElements()) {
             String key = (String) propertyNames.nextElement();
-            if (acceptedHeaders.contains(key)) {
-                Object value = msg.getObjectProperty(key);
-                map.put(key, value.toString());
-            }
-        }
 
-        return map;
+             // Filtrar los encabezados si es necesario
+            if (!filteredHeaders || acceptedHeaders.contains(key)) {
+                Object value = msg.getObjectProperty(key);
+
+                // Añadir el valor al mapa si no es nulo
+                if (value != null) {
+                    headers.put(key, value.toString());
+                }
+            }       
+        }
     }
 
     private EventSchema parsePayload(Message msg) throws JMSException {
@@ -150,7 +167,7 @@ public class JMSListener {
         }
     }
 
-    private void sendMessageAsync(String topic, EventSchema payload, Map<String, String> headers) {
+    private void sendMessageAsync(String topic, EventSchema payload, Map<String, ?> headers) {
         ListenableFuture<SendResult<String, EventSchema>> future = 
             kafkaTemplate.send(createKafkaMessage(topic, payload, headers));
 
@@ -180,7 +197,7 @@ public class JMSListener {
         LOGGER.error(customMsg(header, msg));
     }
 
-    private void logMessage(String message, EventSchema payload, Map<String, String> headers) {
+    private void logMessage(String message, EventSchema payload, Map<String, ?> headers) {
         try {
             final StringBuffer sb = new StringBuffer();
 

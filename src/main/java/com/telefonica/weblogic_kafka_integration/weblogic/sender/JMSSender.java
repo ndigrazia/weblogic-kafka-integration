@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.telefonica.weblogic_kafka_integration.weblogic.config.JMSApplicationConfig;
+import com.telefonica.weblogic_kafka_integration.weblogic.util.Util;
 
 public class JMSSender {
 
@@ -99,7 +100,7 @@ public class JMSSender {
         if(args.length >= 5)
             payload = args[4];
         else {
-            payload = createASampleEvent();
+            payload = Util.createASampleEvent();
         }
 
         JMSSender sender = null;
@@ -137,30 +138,6 @@ public class JMSSender {
                     return;
                 }
         }
-    }
-
-    private static String createASampleEvent() {
-        String jsonString = "{\n" +
-            "    \"creation_issue\": \"2024-10-03\",\n" +
-            "    \"event_id\": \"597e8f46-c021-4a66-884c-20e2ba1ec0c5\",\n" +
-            "    \"type\": \"UPDATE\",\n" +
-            "    \"subtype\": \"IDENTIFIER\",\n" +
-            "    \"version\": \"0\",\n" +
-            "    \"data\": {\n" +
-            "        \"creation_date\": \"2024-10-03\",\n" +
-            "        \"payload\": {\n" +
-            "            \"new_identifier.id\": \"265946425\",\n" +
-            "            \"new_identifier.type\": \"1122334455\",\n" +
-            "            \"notification_event_id\": \"597e8f46-c021-4a66-884c-20e2ba1ec0c5\",\n" +
-            "            \"old_identifier.id\": \"163143603\",\n" +
-            "            \"old_identifier.type\": \"\"\n" +
-            "        },\n" +
-            "        \"user_id\": \"163143603\"\n" +
-            "    },\n" +
-            "    \"publisher\": \"ESB\"\n" +
-            "}";
-            
-        return jsonString;
     }
 
 }

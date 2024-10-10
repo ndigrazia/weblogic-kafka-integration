@@ -42,10 +42,10 @@ docker-compose up -d
 
 ###  Create JMSServer, ConnectionFactory, JMSModule, Queue in weblogic Server
 
-
 docker-compose exec kafka kafka-topics.sh --create --topic myTopic --partitions 1 --replication-factor 1 --bootstrap-server kafka:9093
 docker-compose exec kafka kafka-console-consumer.sh --topic myTopic --from-beginning --bootstrap-server kafka:9093
 docker-compose exec kafka kafka-console-producer.sh --topic myTopic  --broker-list kafka:9093
 
 ### Launch JMS Sender
 /usr/bin/env /usr/local/software/jdk1.8.0_411/bin/java weblogic.jms.weblogic.sender.JMSSender t3://localhost:7001 jms/myConnectionFactory jms/myTestQueue true
+
