@@ -59,22 +59,11 @@ public class KafkaConfig {
     @Bean
     public ProducerFactory<String, EventSchema> kafkaFactory() {
         Map<String, Object> configProps = new HashMap<>();
+        
+        enableBasicConfig(configProps);
 
-        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
-        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, keySerializerClass);
-        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, valueSerializerClass);
-        configProps.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, maxRequestSizeConfig);
-
-        if(securityProtocol!=null) {
-            configProps.put(SslConfigs.SSL_PROTOCOL_CONFIG, sslProtocol);
-            configProps.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, trustStoreLocation);
-            configProps.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, trustStorePassword);
-            configProps.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, keyStoreLocation);
-            configProps.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, keyStorePassword);
-            configProps.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, sslKeyPassword);
-            configProps.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, trustStoreType);
-            configProps.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, keyStoreType);
-            configProps.put("security.protocol", securityProtocol);
+        if(isSecurityEnabled()) {
+            enableSecurity(configProps);
         }
 
         return new DefaultKafkaProducerFactory<>(configProps);
@@ -83,6 +72,29 @@ public class KafkaConfig {
     @Bean
     public KafkaTemplate<String, EventSchema> kafkaTemplate() {
         return new KafkaTemplate<>(kafkaFactory());
+    }
+
+    private void enableBasicConfig(Map<String, Object> configProps) {
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, keySerializerClass);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, valueSerializerClass);
+        configProps.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, maxRequestSizeConfig);
+    }
+    
+    private boolean isSecurityEnabled() {
+        return securityProtocol != null;
+    }
+    
+    private void enableSecurity(Map<String, Object> configProps) {
+        configProps.put(SslConfigs.SSL_PROTOCOL_CONFIG, sslProtocol);
+        configProps.put(SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG, trustStoreLocation);
+        configProps.put(SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG, trustStorePassword);
+        configProps.put(SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG, keyStoreLocation);
+        configProps.put(SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG, keyStorePassword);
+        configProps.put(SslConfigs.SSL_KEY_PASSWORD_CONFIG, sslKeyPassword);
+        configProps.put(SslConfigs.SSL_TRUSTSTORE_TYPE_CONFIG, trustStoreType);
+        configProps.put(SslConfigs.SSL_KEYSTORE_TYPE_CONFIG, keyStoreType);
+        configProps.put("security.protocol", securityProtocol);
     }
 
 }
