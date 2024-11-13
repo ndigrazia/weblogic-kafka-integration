@@ -12,7 +12,7 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 
-import com.telefonica.schemas.EventSchema;
+import io.cloudevents.CloudEvent;
 
 @Configuration
 public class KafkaConfig {
@@ -57,7 +57,7 @@ public class KafkaConfig {
     private String trustStorePassword;
    
     @Bean
-    public ProducerFactory<String, EventSchema> kafkaFactory() {
+    public ProducerFactory<String, CloudEvent> kafkaFactory() {
         Map<String, Object> configProps = new HashMap<>();
         
         enableBasicConfig(configProps);
@@ -70,7 +70,7 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, EventSchema> kafkaTemplate() {
+    public KafkaTemplate<String, CloudEvent> kafkaTemplate() {
         return new KafkaTemplate<>(kafkaFactory());
     }
 

@@ -1,6 +1,9 @@
 package com.telefonica.weblogic_kafka_integration.weblogic;
 
+import java.net.URI;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
@@ -18,19 +21,23 @@ import org.springframework.beans.factory.annotation.Value;
 
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.kafka.support.SendResult;
-import org.springframework.messaging.support.MessageBuilder;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.concurrent.ListenableFuture;
+
 import org.springframework.util.concurrent.ListenableFutureCallback;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import com.telefonica.schemas.event.jms.JmsCloudEvent;
+
 import com.telefonica.weblogic_kafka_integration.kafka.core.MessageDeliveryMode;
-import com.telefonica.schemas.EventSchema;
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+import io.cloudevents.jackson.JsonFormat;
 
 @Service
 @Transactional
@@ -39,9 +46,9 @@ public class JMSListener {
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSListener.class.getName());
  
     @Autowired
-    private KafkaTemplate<String, EventSchema> kafkaTemplate;
+    private KafkaTemplate<String, CloudEvent> kafkaTemplate;
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private ObjectMapper mapper = new ObjectMapper().registerModule(JsonFormat.getCloudEventJacksonModule());
 
     @Value(value = "${kafka.topic.name}")
     private String topicName;  
@@ -56,7 +63,7 @@ public class JMSListener {
     boolean filteredHeaders;
 
     @Value("${spring.kafka.partition:#{null}}") 
-    private Integer partition;
+    private String partition;
 
     @PostConstruct
     public void init() {
@@ -69,7 +76,7 @@ public class JMSListener {
 
     @JmsListener(containerFactory = "factory", destination = "${jms.queue.name}")
     public void listenToMessages(Message msg) throws JMSException {
-         try {
+        try {
             processMessage(msg);
         } catch (Exception e) {
             handleError(e);
@@ -78,21 +85,17 @@ public class JMSListener {
     }
 
     private void processMessage(Message msg) throws JMSException {
-        final EventSchema payload = parsePayload(msg);
+        final JmsCloudEvent payload = parsePayload(msg);
         
-        final Map<String, Object> headers = new HashMap<>();
+        final Map<String, String> headers = new HashMap<>();
         addHeaders(headers, msg);
-    
+        
         logMessage("MESSAGE RECEIVED", payload, headers);
 
-        //If 'partition' is defined and valid, set the partition header
-        if(partition!=null)
-            headers.put(KafkaHeaders.PARTITION_ID, partition);
-        
         sendMessage(payload, headers);
     }
         
-    private void sendMessage(EventSchema payload, Map<String, ?> headers) 
+    private void sendMessage(JmsCloudEvent payload, Map<String, String> headers) 
         throws JMSException {
         if(LOGGER.isDebugEnabled())
             LOGGER.debug("Delibery Mode: " + deliveryMode); 
@@ -112,12 +115,13 @@ public class JMSListener {
         }
     }
 
-    private void sendMessageSync(String topic, EventSchema payload, Map<String, ?> headers) 
+    private void sendMessageSync(String topic, JmsCloudEvent payload, Map<String, String> headers) 
         throws JMSException {
         try {
-            kafkaTemplate.send(createKafkaMessage(topic, payload, headers)).get();
-            logMessage("MESSAGE SENT TO KAFKA", payload, headers);
-         } catch (InterruptedException | ExecutionException e) {
+            CloudEvent ce = buildCloudEvent(payload, headers);
+            kafkaTemplate.send(topic, getPartition(), null, ce).get();
+            logMessage("MESSAGE SENT TO KAFKA", ce, null);
+         } catch (InterruptedException | ExecutionException | JsonProcessingException  e) {
             JMSException jmsException = 
                 new JMSException("ERROR SENDING MESSAGE TO KAFA.");
             jmsException.initCause(e);
@@ -125,25 +129,33 @@ public class JMSListener {
         }
     }     
 
-    private org.springframework.messaging.Message<EventSchema> createKafkaMessage(String topic, 
-        EventSchema payload, Map<String, ?> headers) {
-        final org.springframework.messaging.Message<EventSchema> message = MessageBuilder
-                .withPayload(payload)
-                .setHeader(KafkaHeaders.TOPIC, topic)
-                .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEventId())
-                .copyHeaders(headers)
-                .build();
-
-        return message;
+    private Integer getPartition() {
+        return partition==null?null:Integer.parseInt(partition);
     }
 
-    void addHeaders(Map<String, Object> headers, Message msg) throws JMSException {
+    private CloudEvent buildCloudEvent(JmsCloudEvent payload, Map<String, String> headers) 
+        throws JsonProcessingException {
+
+        final CloudEventBuilder ceb = CloudEventBuilder.v1()
+                .withId(payload.getId())
+                .withSource(URI.create(payload.getSource()))
+                .withDataContentType(payload.getDataContentType())  
+                .withTime(OffsetDateTime.parse(payload.getTime(), DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+                .withType(payload.getType())
+                .withData(mapper.writeValueAsBytes(payload.getData()));
+      
+        headers.forEach(ceb::withExtension);
+
+        return ceb.build();
+    }
+
+    void addHeaders(Map<String, String> headers, Message msg) throws JMSException {
         Enumeration<?> propertyNames = msg.getPropertyNames();
 
         while (propertyNames.hasMoreElements()) {
             String key = (String) propertyNames.nextElement();
-
-             // Filtrar los encabezados si es necesario
+            
+            // Filtrar los encabezados si es necesario
             if (!filteredHeaders || acceptedHeaders.contains(key)) {
                 Object value = msg.getObjectProperty(key);
 
@@ -155,10 +167,10 @@ public class JMSListener {
         }
     }
 
-    private EventSchema parsePayload(Message msg) throws JMSException {
+    private JmsCloudEvent parsePayload(Message msg) throws JMSException {
         try {
            return mapper.readValue(msg.getBody(String.class),
-            EventSchema.class);
+            JmsCloudEvent.class);
         } catch (JsonProcessingException ex) {
             JMSException jmsException = 
                 new JMSException("ERROR PARSING JSON MESSAGE.");
@@ -167,21 +179,28 @@ public class JMSListener {
         }
     }
 
-    private void sendMessageAsync(String topic, EventSchema payload, Map<String, ?> headers) {
-        ListenableFuture<SendResult<String, EventSchema>> future = 
-            kafkaTemplate.send(createKafkaMessage(topic, payload, headers));
-
-        future.addCallback(new ListenableFutureCallback<SendResult<String, EventSchema>>() {
-            @Override
-            public void onSuccess(SendResult<String, EventSchema> result) {
-                logMessage("MESSAGE SENT TO KAFKA", payload, headers);
+    private void sendMessageAsync(String topic, JmsCloudEvent payload, Map<String, String> headers)
+        throws JMSException {
+            try {
+                CloudEvent ce = buildCloudEvent(payload, headers);
+                kafkaTemplate.send(topic, getPartition(), null, ce)
+                    .addCallback(new ListenableFutureCallback<SendResult<String, CloudEvent>>() {
+                        @Override
+                        public void onSuccess(SendResult<String, CloudEvent> result) {
+                            logMessage("MESSAGE SENT TO KAFKA", ce, null);
+                        }
+            
+                        @Override
+                        public void onFailure(Throwable ex) {
+                            logErrorMsg("ERROR SENDING MESSAGE TO KAFKA", ex.getMessage());
+                        }
+                    });
+            } catch (JsonProcessingException e) {
+                JMSException jmsException = 
+                new JMSException("ERROR SENDING MESSAGE TO KAFA.");
+                jmsException.initCause(e);
+                throw jmsException;
             }
-
-            @Override
-            public void onFailure(Throwable ex) {
-                logErrorMsg("ERROR SENDING MESSAGE TO KAFKA", ex.getMessage());
-            }
-        });
     }
 
     private String customMsg(String header, String msg) {
@@ -197,18 +216,21 @@ public class JMSListener {
         LOGGER.error(customMsg(header, msg));
     }
 
-    private void logMessage(String message, EventSchema payload, Map<String, ?> headers) {
+    private void logMessage(String header, Object event, Map<String, String> headers) {
         try {
-            final StringBuffer sb = new StringBuffer();
+            StringBuffer sb = new StringBuffer();
+            
+            sb.append("BODY: " + mapper.writeValueAsString(event) + "\n");
 
-            sb.append("BODY: " +  mapper.writeValueAsString(payload) + "\n");
-            sb.append("HEADERS: " + headers + "\n");
-    
-            logInfoMsg(message, sb.toString());
+            if(event instanceof JmsCloudEvent) {
+                sb.append("HEADERS: " + headers + "\n");
+            }
+           
+            logInfoMsg(header, sb.toString());
         } catch (JsonProcessingException e) {
-            logErrorMsg("JSON PARSE ERROR", 
+            logErrorMsg("JSON PARSE ERROR",  
                 "Conversion of JSON Body to String failed. The message did not log!");
-        }           
+        }
     }
 
     private void handleError(Throwable e) {

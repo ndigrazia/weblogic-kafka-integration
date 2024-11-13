@@ -6,7 +6,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest
 public class WeblogicKafkaIntegrationServiceTests {
 
-   
     @Test
     public void testSomething()  {
     }

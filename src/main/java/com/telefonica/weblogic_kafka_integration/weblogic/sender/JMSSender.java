@@ -28,8 +28,11 @@ public class JMSSender {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSSender.class.getName());
 
-    private static final String ENRICHMENT_MODE = "EnrichmentEventContext";
-    private static final String DELAYED_MODE = "EventDeliveryMode";
+    private static final String ENRICHMENT_MODE = "enrichmenteventcontext";
+    private static final String DELAYED_MODE = "eventdeliverymode";
+
+    private static final String ENRICHMENT_MODE_VALUE = "eventtype";
+    private static final String DELAYED_MODE_VALUE = "delayed";
 
     private QueueConnectionFactory queueConnectionFactory;
     private QueueSession queueSession;
@@ -52,8 +55,8 @@ public class JMSSender {
 
     public TextMessage send(String msg, boolean withHeaders) throws JMSException {
         if (withHeaders) {
-            message.setStringProperty(ENRICHMENT_MODE, "EventType");
-            message.setStringProperty(DELAYED_MODE, "Delayed");
+            message.setStringProperty(ENRICHMENT_MODE, ENRICHMENT_MODE_VALUE);
+            message.setStringProperty(DELAYED_MODE, DELAYED_MODE_VALUE);
         } 
            
         message.setText(msg);
@@ -128,7 +131,7 @@ public class JMSSender {
             LOGGER.info("\nMessage Successfully Sent to the JMS queue!!\n MESSAGE: " +
                  message.getBody(String.class) +  "\n HEADERS: " +(headers == null ? "empty" : headers) + "\n");
         } catch (Exception e) {
-            LOGGER.error("\nError sending message to the JMS queue!!");
+            LOGGER.error("\nError sending message to the JMS queue!!", e);
         } finally {
             if(sender != null)
                 try {
