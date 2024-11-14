@@ -44,6 +44,8 @@ import io.cloudevents.jackson.JsonFormat;
 public class JMSListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSListener.class.getName());
+    
+    private static final String KEY_FILE_NAME = "userId";
  
     @Autowired
     private KafkaTemplate<String, CloudEvent> kafkaTemplate;
@@ -64,6 +66,9 @@ public class JMSListener {
 
     @Value("${spring.kafka.partition:#{null}}") 
     private String partition;
+
+    @Value("${spring.kafka.key.enabled:#{false}}") 
+    private boolean keyEnabled;
 
     @PostConstruct
     public void init() {
@@ -119,7 +124,7 @@ public class JMSListener {
         throws JMSException {
         try {
             CloudEvent ce = buildCloudEvent(payload, headers);
-            kafkaTemplate.send(topic, getPartition(), null, ce).get();
+            kafkaTemplate.send(topic, getPartition(), getKey(payload), ce).get();
             logMessage("MESSAGE SENT TO KAFKA", ce, null);
          } catch (InterruptedException | ExecutionException | JsonProcessingException  e) {
             JMSException jmsException = 
@@ -128,6 +133,10 @@ public class JMSListener {
             throw jmsException;
         }
     }     
+
+    private String getKey(JmsCloudEvent payload) {
+        return keyEnabled?payload.getData().get(KEY_FILE_NAME).asText():null;
+    }
 
     private Integer getPartition() {
         return partition==null?null:Integer.parseInt(partition);
@@ -183,7 +192,7 @@ public class JMSListener {
         throws JMSException {
             try {
                 CloudEvent ce = buildCloudEvent(payload, headers);
-                kafkaTemplate.send(topic, getPartition(), null, ce)
+                kafkaTemplate.send(topic, getPartition(), getKey(payload), ce)
                     .addCallback(new ListenableFutureCallback<SendResult<String, CloudEvent>>() {
                         @Override
                         public void onSuccess(SendResult<String, CloudEvent> result) {
