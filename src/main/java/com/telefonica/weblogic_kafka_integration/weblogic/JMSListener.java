@@ -37,6 +37,8 @@ import com.telefonica.schemas.EventSchema;
 public class JMSListener {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JMSListener.class.getName());
+
+    private static final String KEY_FILE_NAME = "user_id";
  
     @Autowired
     private KafkaTemplate<String, EventSchema> kafkaTemplate;
@@ -57,6 +59,9 @@ public class JMSListener {
 
     @Value("${spring.kafka.partition:#{null}}") 
     private Integer partition;
+    
+    @Value("${spring.kafka.key.enabled:#{false}}") 
+    private boolean keyEnabled;
 
     @PostConstruct
     public void init() {
@@ -75,6 +80,10 @@ public class JMSListener {
             handleError(e);
             throw e;
         }
+    }
+
+    private String getKey(EventSchema payload) {
+        return keyEnabled?payload.getData().get(KEY_FILE_NAME).asText():null;
     }
 
     private void processMessage(Message msg) throws JMSException {
@@ -130,7 +139,7 @@ public class JMSListener {
         final org.springframework.messaging.Message<EventSchema> message = MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, topic)
-                .setHeader(KafkaHeaders.MESSAGE_KEY, payload.getEventId())
+                .setHeader(KafkaHeaders.MESSAGE_KEY, getKey(payload))
                 .copyHeaders(headers)
                 .build();
 
