@@ -47,5 +47,19 @@ docker-compose exec kafka kafka-console-consumer.sh --topic myTopic --from-begin
 docker-compose exec kafka kafka-console-producer.sh --topic myTopic  --broker-list kafka:9093
 
 ### Launch JMS Sender
+
 /usr/bin/env /usr/local/software/jdk1.8.0_411/bin/java weblogic.jms.weblogic.sender.JMSSender t3://localhost:7001 jms/myConnectionFactory jms/myTestQueue true
 
+### Publish jar files
+
+mvn install:install-file -Dfile=/home/nelson/tmp/weblogic-kafka-integration/src/main/resources/lib/wlthint3client.jar -DgroupId=wls -DartifactId=wlsclient -Dversion=1.0 -Dpackaging=jar
+
+mvn install:install-file -Dfile=/home/nelson/tmp/weblogic-kafka-integration/src/main/resources/lib/events-schemas-2.0.jar -DgroupId=com.telefonica -DartifactId=events-schemas -Dversion=2.0 -Dpackaging=jar
+
+### Make a docker image
+
+mvn clean install -Pcontainerize -DskipTests
+
+### Run a docker image
+
+docker run -it --rm telefonica/weblogic-kafka-integration 

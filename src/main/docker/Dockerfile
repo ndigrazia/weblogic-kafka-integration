@@ -27,4 +27,6 @@ WORKDIR /opt/telefonica
 
 # Main command
 USER 185
+
 ENTRYPOINT ["/docker-entrypoint.sh"]
+#CMD ["bash"]
