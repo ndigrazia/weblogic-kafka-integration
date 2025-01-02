@@ -63,3 +63,19 @@ mvn clean install -Pcontainerize -DskipTests
 ### Run a docker image
 
 docker run -it --rm telefonica/weblogic-kafka-integration 
+
+### Run a docker image with files config outside
+
+docker run -it --rm \
+    -v /Users/willi/development/tasa/weblogic-kafka-integration/local/application.properties:/app/config/application.properties \
+    -v /Users/willi/development/tasa/weblogic-kafka-integration/local/client.p12:/app/config/client.p12 \
+    -v /Users/willi/development/tasa/weblogic-kafka-integration/local/cluster.p12:/app/config/cluster.p12 \
+    -e SPRING_CONFIG_LOCATION=file:/app/config/application.properties \
+    --add-host=at3osbc106:10.167.52.168 \
+    --add-host=at3osbc206:10.167.145.162 \
+    --add-host=kernel-kafka-0-movistar-amq-streams.apps.ocpnp.brcrh.tcloud.ar:10.166.46.41 \
+    --add-host=kernel-kafka-1-movistar-amq-streams.apps.ocpnp.brcrh.tcloud.ar:10.166.46.41 \
+    --add-host=kernel-kafka-2-movistar-amq-streams.apps.ocpnp.brcrh.tcloud.ar:10.166.46.41 \
+    --add-host=kernel-kafka-bootstrap-movistar-amq-streams.apps.ocpnp.brcrh.tcloud.ar:10.166.46.41 \
+    --name=weblogic \
+    telefonica/weblogic-kafka-integration
