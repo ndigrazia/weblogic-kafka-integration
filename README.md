@@ -79,3 +79,45 @@ docker run -it --rm \
     --add-host=kernel-kafka-bootstrap-movistar-amq-streams.apps.ocpnp.brcrh.tcloud.ar:10.166.46.41 \
     --name=weblogic \
     telefonica/weblogic-kafka-integration
+
+### Pod Config
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: weblogic-kafka-integration-pod
+spec:
+  hostAliases:
+    - ip: 10.167.52.168
+      hostnames:
+        - at3osbc106
+    - ip: 10.167.145.162
+      hostnames:
+        - at3osbc206
+  containers:
+  - name: weblogic-kafka-integration-container
+    image: ndigrazia/weblogic-kafka-integration
+    env:
+    - name: SPRING_CONFIG_LOCATION
+      value: "file:/app/config/application.properties"
+    volumeMounts:
+    - name: config-volume
+      mountPath: /app/config
+      readOnly: true
+    - name: clientp12-volume
+      mountPath: /app/config/client
+      readOnly: true
+    - name: clusterp12-volume
+      mountPath: /app/config/cluster
+      readOnly: true
+  volumes:
+  - name: config-volume
+    configMap:
+      name: weblogic-kafka-integration-application-properties
+  - name: clientp12-volume
+    configMap:
+      name: weblogic-kafka-integration-clientp12
+  - name: clusterp12-volume
+    configMap:
+      name: weblogic-kafka-integration-clusterp12
+	  
