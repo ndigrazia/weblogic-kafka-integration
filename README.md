@@ -81,7 +81,7 @@ docker run -it --rm \
     telefonica/weblogic-kafka-integration
 
 ### Pod Config
-
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -120,4 +120,4 @@ spec:
   - name: clusterp12-volume
     configMap:
       name: weblogic-kafka-integration-clusterp12
-	  
+```  
